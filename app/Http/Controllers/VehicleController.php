@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehicle;
-use App\Services\ElasticsearchService;
+use App\Repositories\VehicleRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -13,24 +12,23 @@ use Illuminate\Http\JsonResponse;
  * Controller responsável pelo gerenciamento de veículos
  * 
  * Este controller gerencia todas as operações CRUD relacionadas aos veículos,
- * além de oferecer funcionalidades de busca avançada usando Elasticsearch.
- * A implementação utiliza o Elasticsearch para realizar buscas eficientes
- * enquanto mantém o banco de dados relacional como fonte primária de dados.
+ * utilizando o padrão Repository para separar a lógica de acesso a dados da lógica de negócios.
+ * Implementa funcionalidades de busca avançada usando Elasticsearch via repositório.
  */
 class VehicleController extends Controller
 {
-    protected $elasticsearchService;
+    protected $vehicleRepository;
 
     /**
      * Construtor do controller
      * 
-     * Inicializa o serviço de Elasticsearch necessário para as operações de busca
+     * Inicializa o repositório de veículos que encapsula o acesso a dados e Elasticsearch
      * 
-     * @param ElasticsearchService $elasticsearchService Serviço que gerencia a conexão com Elasticsearch
+     * @param VehicleRepository $vehicleRepository Repositório de veículos
      */
-    public function __construct(ElasticsearchService $elasticsearchService)
+    public function __construct(VehicleRepository $vehicleRepository)
     {
-        $this->elasticsearchService = $elasticsearchService;
+        $this->vehicleRepository = $vehicleRepository;
     }
 
     /**
@@ -50,67 +48,24 @@ class VehicleController extends Controller
             $page = $request->get('page', 1);
             $search = $request->get('search');
 
-            // Utilizando Elasticsearch para busca, se houver um termo de busca
+            // Determina se deve usar busca simples ou Elasticsearch
             if ($search) {
-                Log::info('Realizando busca com Elasticsearch', ['termo' => $search]);
+                // Busca avançada com Elasticsearch via repositório
+                $result = $this->vehicleRepository->searchWithElasticsearch($search, $perPage, $page);
                 
-                // Definição de campos e pesos para busca
-                $searchFields = [
-                    'model^3', // O modelo tem peso maior na relevância
-                    'brand^2',
-                    'year',
-                    'color',
-                    'license_plate',
-                    'description'
-                ];
-                
-                // Executa a busca no Elasticsearch
-                $searchResults = $this->elasticsearchService->search('vehicles', [
-                    'query' => [
-                        'multi_match' => [
-                            'query' => $search,
-                            'fields' => $searchFields,
-                            'fuzziness' => 'AUTO'
-                        ]
-                    ]
-                ]);
-
-                // Coleta os IDs dos resultados para buscar no banco de dados
-                $ids = collect($searchResults['hits']['hits'])->pluck('_id')->toArray();
-                if (empty($ids)) {
-                    return response()->json([
-                        'data' => [],
-                        'meta' => [
-                            'total' => 0,
-                            'per_page' => (int)$perPage,
-                            'current_page' => (int)$page,
-                            'last_page' => 0,
-                        ]
-                    ]);
-                }
-
-                // Busca os registros completos do banco usando os IDs do Elasticsearch
-                $query = Vehicle::whereIn('id', $ids)
-                    ->orderByRaw("FIELD(id, " . implode(',', $ids) . ")"); // Mantém a ordem de relevância
-                
-                $total = $query->count();
-                $vehicles = $query->skip(($page - 1) * $perPage)
-                    ->take($perPage)
-                    ->get();
-
                 return response()->json([
-                    'data' => $vehicles,
+                    'data' => $result['items'],
                     'meta' => [
-                        'total' => $total,
-                        'per_page' => (int)$perPage,
-                        'current_page' => (int)$page,
-                        'last_page' => ceil($total / $perPage),
+                        'total' => $result['total'],
+                        'per_page' => $result['per_page'],
+                        'current_page' => $result['current_page'],
+                        'last_page' => $result['last_page'],
                     ]
                 ]);
             }
 
             // Listagem simples quando não há termo de busca
-            $vehicles = Vehicle::paginate($perPage, ['*'], 'page', $page);
+            $vehicles = $this->vehicleRepository->getAllPaginated($perPage, $page);
             
             return response()->json([
                 'data' => $vehicles->items(),
@@ -122,11 +77,13 @@ class VehicleController extends Controller
                 ]
             ]);
         } catch (\Throwable $e) {
+            // Log detalhado do erro para diagnóstico
             Log::error('Erro na listagem de veículos', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             
+            // Resposta de erro amigável
             return response()->json([
                 'message' => 'Erro ao listar veículos',
                 'error' => $e->getMessage()
@@ -135,9 +92,56 @@ class VehicleController extends Controller
     }
 
     /**
+     * Pesquisa veículos com base em um termo de busca
+     * 
+     * Utiliza Elasticsearch para realizar uma busca mais eficiente e relevante
+     * nos veículos, considerando diversos campos como placa, fabricante e modelo.
+     * 
+     * @param Request $request Requisição HTTP contendo parâmetro de busca 'q'
+     * @return JsonResponse Lista de veículos encontrados com base no termo de busca
+     */
+    public function search(Request $request): JsonResponse
+    {
+        try {
+            $searchTerm = $request->get('q');
+            $perPage = $request->get('per_page', 10);
+            $page = $request->get('page', 1);
+
+            if (empty($searchTerm)) {
+                return response()->json([
+                    'message' => 'É necessário fornecer um termo de busca (parâmetro q)',
+                ], 400);
+            }
+
+            $result = $this->vehicleRepository->searchWithElasticsearch($searchTerm, $perPage, $page);
+            
+            return response()->json([
+                'data' => $result['items'],
+                'meta' => [
+                    'total' => $result['total'],
+                    'per_page' => $result['per_page'],
+                    'current_page' => $result['current_page'],
+                    'last_page' => $result['last_page'],
+                    'search_term' => $searchTerm
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Erro na pesquisa de veículos', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erro ao pesquisar veículos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Armazena um novo veículo no sistema
      * 
-     * Valida os dados do veículo e, se válidos, cria um novo registro.
+     * Valida os dados do veículo e, se válidos, cria um novo registro via repositório.
      * A indexação no Elasticsearch é feita automaticamente pelo observer.
      * 
      * @param Request $request Requisição HTTP contendo os dados do veículo
@@ -146,15 +150,13 @@ class VehicleController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            // Validação dos dados recebidos
             $validator = Validator::make($request->all(), [
-                'brand' => 'required|string|max:100',
+                'plate' => 'required|string|max:10|unique:vehicles,plate',
+                'make' => 'required|string|max:100',
                 'model' => 'required|string|max:100',
-                'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
-                'color' => 'required|string|max:50',
-                'license_plate' => 'required|string|max:10|unique:vehicles,license_plate',
                 'daily_rate' => 'required|numeric|min:0',
-                'is_available' => 'boolean',
-                'description' => 'nullable|string',
+                'available' => 'boolean',
             ]);
 
             if ($validator->fails()) {
@@ -164,15 +166,15 @@ class VehicleController extends Controller
                 ], 422);
             }
 
-            $vehicle = Vehicle::create($request->all());
+            // Criação do veículo via repositório
+            $vehicle = $this->vehicleRepository->create($request->all());
             
-            // A indexação no Elasticsearch é feita pelo observer
-
             return response()->json([
                 'message' => 'Veículo criado com sucesso',
                 'data' => $vehicle
             ], 201);
         } catch (\Throwable $e) {
+            // Log detalhado do erro
             Log::error('Erro ao criar veículo', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -194,7 +196,8 @@ class VehicleController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $vehicle = Vehicle::findOrFail($id);
+            // Busca o veículo via repositório
+            $vehicle = $this->vehicleRepository->findById($id);
             
             return response()->json([
                 'data' => $vehicle
@@ -220,7 +223,7 @@ class VehicleController extends Controller
     /**
      * Atualiza os dados de um veículo específico
      * 
-     * Valida os dados recebidos e atualiza o registro do veículo.
+     * Valida os dados recebidos e atualiza o registro do veículo via repositório.
      * A atualização no Elasticsearch é feita automaticamente pelo observer.
      * 
      * @param Request $request Requisição HTTP com os dados atualizados
@@ -230,17 +233,13 @@ class VehicleController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         try {
-            $vehicle = Vehicle::findOrFail($id);
-            
+            // Validação dos dados recebidos
             $validator = Validator::make($request->all(), [
-                'brand' => 'sometimes|required|string|max:100',
+                'plate' => 'sometimes|required|string|max:10|unique:vehicles,plate,' . $id,
+                'make' => 'sometimes|required|string|max:100',
                 'model' => 'sometimes|required|string|max:100',
-                'year' => 'sometimes|required|integer|min:1900|max:' . (date('Y') + 1),
-                'color' => 'sometimes|required|string|max:50',
-                'license_plate' => 'sometimes|required|string|max:10|unique:vehicles,license_plate,' . $id,
                 'daily_rate' => 'sometimes|required|numeric|min:0',
-                'is_available' => 'sometimes|boolean',
-                'description' => 'nullable|string',
+                'available' => 'sometimes|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -250,10 +249,9 @@ class VehicleController extends Controller
                 ], 422);
             }
 
-            $vehicle->update($request->all());
+            // Atualização do veículo via repositório
+            $vehicle = $this->vehicleRepository->update($id, $request->all());
             
-            // A atualização no Elasticsearch é feita pelo observer
-
             return response()->json([
                 'message' => 'Veículo atualizado com sucesso',
                 'data' => $vehicle
@@ -279,7 +277,7 @@ class VehicleController extends Controller
     /**
      * Remove um veículo do sistema
      * 
-     * Exclui o registro do veículo do banco de dados.
+     * Exclui o registro do veículo do banco de dados via repositório.
      * A remoção do índice no Elasticsearch é feita automaticamente pelo observer.
      * 
      * @param int $id ID do veículo a ser removido
@@ -288,10 +286,8 @@ class VehicleController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $vehicle = Vehicle::findOrFail($id);
-            $vehicle->delete();
-            
-            // A remoção do documento no Elasticsearch é feita pelo observer
+            // Exclusão do veículo via repositório
+            $this->vehicleRepository->delete($id);
             
             return response()->json([
                 'message' => 'Veículo removido com sucesso'

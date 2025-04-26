@@ -17,29 +17,24 @@ Uma API RESTful para gerenciamento de aluguel de veículos, construída com Lara
 - Composer
 - MySQL 8.0+
 - Elasticsearch 7.x+
-- Docker e Docker Compose (recomendado para uso com Laravel Sail)
+- Docker e Docker Compose
 
 ## Instalação
 
-### Usando Laravel Sail (recomendado)
+### Usando Docker (recomendado)
 
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/seu-usuario/vehicle-rental-api.git
-   cd vehicle-rental-api
+   git clone https://github.com/JohnPonciano/LocadoradeVeiculos.git
+   cd LocadoradeVeiculos
    ```
 
-2. Instale as dependências do Composer:
-   ```bash
-   docker run --rm -v $(pwd):/app composer install
-   ```
-
-3. Configure o arquivo .env:
+2. Configure o arquivo .env:
    ```bash
    cp .env.example .env
    ```
 
-4. Configure as variáveis de ambiente do Elasticsearch no .env:
+3. Configure as variáveis de ambiente do Elasticsearch no .env:
    ```
    ELASTICSEARCH_ENABLED=true
    ELASTICSEARCH_HOST=elasticsearch
@@ -49,24 +44,26 @@ Uma API RESTful para gerenciamento de aluguel de veículos, construída com Lara
    ELASTICSEARCH_PASS=
    ```
 
-5. Inicie os containers:
+4. Construa e inicie os containers:
    ```bash
-   ./vendor/bin/sail up -d
+   docker-compose build --no-cache laravel.test
+   docker-compose up -d
    ```
 
-6. Execute o script de configuração:
+5. Instale as dependências e configure o projeto:
    ```bash
-   ./vendor/bin/sail bash setup.sh
+   docker-compose exec laravel.test composer install
+   docker-compose exec laravel.test php artisan key:generate
+   docker-compose exec laravel.test php artisan migrate --seed
+   docker-compose exec laravel.test php artisan jwt:secret
    ```
 
-7. Crie os índices do Elasticsearch:
+6. Crie os índices do Elasticsearch:
    ```bash
-   ./vendor/bin/sail artisan elastic:create-indices
+   docker-compose exec laravel.test php artisan elastic:create-indices
    ```
 
-### Usando Container Docker (para usuários avançados)
-
-Se você estiver usando um container Docker personalizado, verifique o arquivo [CONTAINER_GUIDE.md](CONTAINER_GUIDE.md) para instruções detalhadas sobre como configurar e solucionar problemas comuns.
+Pronto! Acesse a API em http://localhost
 
 ## Estrutura da API
 
