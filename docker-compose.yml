@@ -17,6 +17,7 @@ services:
       ELASTICSEARCH_HOST: elasticsearch
       ELASTICSEARCH_PORT: 9200
       ELASTICSEARCH_SCHEME: http
+      REPORTS_SERVICE_URL: http://python-reports:3000
     volumes:
       - ./:/var/www/html
       - ./storage:/var/www/html/storage
@@ -86,6 +87,33 @@ services:
         limits:
           cpus: '1'
           memory: 1G
+    networks:
+      - app-network
+
+  python-reports:
+    build:
+      context: ./python-reports
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: locadora
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      PORT: 3000
+      ALLOW_ORIGINS: http://localhost,http://localhost:8000,http://laravel.test
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     networks:
       - app-network
 

@@ -36,6 +36,9 @@ check_service "MySQL" 30 "mysqladmin ping -h\"$DB_HOST\" -u\"$DB_USERNAME\" -p\"
 # Verificar Elasticsearch com timeout de 30 tentativas (90 segundos)
 check_service "Elasticsearch" 30 "curl -s \"$ELASTICSEARCH_SCHEME://$ELASTICSEARCH_HOST:$ELASTICSEARCH_PORT/_cluster/health\" | grep -q '\"status\":\"\\(green\\|yellow\\)\"'"
 
+# Verificar Python Reports Service com timeout de 30 tentativas (90 segundos)
+check_service "Python Reports Service" 30 "curl -s http://python-reports:3000 | grep -q '{\"status\":\"ok\",\"message\":\"Vehicle Rental API Reports Service\"}'"
+
 # Verificar se o Elasticsearch está totalmente operacional
 echo "🔄 Verificando configuração do Elasticsearch..."
 ES_URL="$ELASTICSEARCH_SCHEME://$ELASTICSEARCH_HOST:$ELASTICSEARCH_PORT"

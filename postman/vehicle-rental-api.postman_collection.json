@@ -839,6 +839,59 @@
 				}
 			],
 			"description": "Endpoints para gerenciamento completo do fluxo de aluguéis: reserva, início, término e cancelamento."
+		},
+		{
+			"name": "Relatórios",
+			"item": [
+				{
+					"name": "Relatório de Receita",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/reports/revenue?start=2023-01-01&end=2023-12-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"reports",
+								"revenue"
+							],
+							"query": [
+								{
+									"key": "start",
+									"value": "2023-01-01",
+									"description": "Data inicial (formato YYYY-MM-DD)"
+								},
+								{
+									"key": "end",
+									"value": "2023-12-31",
+									"description": "Data final (formato YYYY-MM-DD)"
+								}
+							]
+						},
+						"description": "Retorna um relatório de receita por veículo no intervalo de datas especificado, incluindo a quantidade de aluguéis e a receita total gerada por cada veículo. Este relatório é processado pelo microserviço Python e retorna dados agregados do banco de dados."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para geração de relatórios e estatísticas do sistema."
 		}
 	],
 	"event": [

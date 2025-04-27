@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\RentalController;
+use App\Http\Controllers\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,4 +43,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('rentals/{rental}/start', [RentalController::class, 'start']);
     Route::post('rentals/{rental}/end', [RentalController::class, 'end']);
     Route::post('rentals/{rental}/cancel', [RentalController::class, 'cancel']);
+    
+    // Rotas para relatórios
+    Route::get('reports/revenue', [ReportController::class, 'revenue']);
 }); 
