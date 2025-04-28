@@ -123,7 +123,8 @@ class VehicleController extends Controller
                     'current_page' => $result['current_page'],
                     'last_page' => $result['last_page'],
                     'search_term' => $searchTerm
-                ]
+                ],
+                'highlights' => $result['highlights']
             ]);
         } catch (\Throwable $e) {
             Log::error('Erro na pesquisa de veículos', [

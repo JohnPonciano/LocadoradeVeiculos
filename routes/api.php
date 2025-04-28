@@ -32,7 +32,7 @@ Route::middleware('auth:api')->group(function () {
     });
     
     // Rotas para veículos
-    Route::get('vehicles/search', [VehicleController::class, 'search']);
+    Route::get('/vehicles/search', [VehicleController::class, 'search']);
     Route::apiResource('vehicles', VehicleController::class);
     
     // Rotas para clientes

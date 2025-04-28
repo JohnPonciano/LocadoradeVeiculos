@@ -8,11 +8,58 @@ return [
         'vehicles' => [
             'mappings' => [
                 'properties' => [
-                    'plate' => ['type' => 'keyword'],
-                    'make' => ['type' => 'text'],
-                    'model' => ['type' => 'text'],
-                    'daily_rate' => ['type' => 'float'],
-                    'available' => ['type' => 'boolean'],
+                    'plate' => [
+                        'type' => 'keyword',
+                        'fields' => [
+                            'text' => [
+                                'type' => 'text',
+                                'analyzer' => 'standard'
+                            ]
+                        ]
+                    ],
+                    'make' => [
+                        'type' => 'text',
+                        'fields' => [
+                            'keyword' => [
+                                'type' => 'keyword',
+                                'ignore_above' => 256
+                            ]
+                        ],
+                        'analyzer' => 'standard'
+                    ],
+                    'model' => [
+                        'type' => 'text',
+                        'fields' => [
+                            'keyword' => [
+                                'type' => 'keyword',
+                                'ignore_above' => 256
+                            ]
+                        ],
+                        'analyzer' => 'standard'
+                    ],
+                    'daily_rate' => [
+                        'type' => 'float'
+                    ],
+                    'available' => [
+                        'type' => 'boolean'
+                    ],
+                    'created_at' => [
+                        'type' => 'date'
+                    ],
+                    'updated_at' => [
+                        'type' => 'date'
+                    ]
+                ]
+            ],
+            'settings' => [
+                'analysis' => [
+                    'analyzer' => [
+                        'custom_analyzer' => [
+                            'type' => 'custom',
+                            'tokenizer' => 'standard',
+                            'filter' => ['lowercase', 'asciifolding']
+                        ]
+                    ]
                 ]
             ]
         ],

@@ -58,24 +58,55 @@ class VehicleRepository implements RepositoryInterface
         // Log da operação para diagnóstico
         Log::info('Buscando veículos com Elasticsearch', ['termo' => $searchTerm]);
         
-        // Definição de campos e pesos para busca
-        $searchFields = [
-            'model^3', // O modelo tem peso maior na relevância
-            'make^2',
-            'plate'
+        // Construir a query do Elasticsearch
+        $query = [
+            'from' => ($page - 1) * $perPage,
+            'size' => $perPage,
+            'query' => [
+                'bool' => [
+                    'should' => [
+                        [
+                            'multi_match' => [
+                                'query' => $searchTerm,
+                                'fields' => [
+                                    'plate^3',
+                                    'plate.text^2',
+                                    'make^2',
+                                    'model^2'
+                                ],
+                                'type' => 'best_fields',
+                                'fuzziness' => 'AUTO',
+                                'operator' => 'or'
+                            ]
+                        ],
+                        [
+                            'term' => [
+                                'plate.keyword' => [
+                                    'value' => $searchTerm,
+                                    'boost' => 4
+                                ]
+                            ]
+                        ]
+                    ],
+                    'minimum_should_match' => 1
+                ]
+            ],
+            'sort' => [
+                '_score' => ['order' => 'desc'],
+                'created_at' => ['order' => 'desc']
+            ],
+            'highlight' => [
+                'fields' => [
+                    'plate' => new \stdClass(),
+                    'make' => new \stdClass(),
+                    'model' => new \stdClass()
+                ]
+            ]
         ];
         
         // Executa a busca no Elasticsearch
-        $searchResults = $this->elasticsearchService->search('vehicles', [
-            'query' => [
-                'multi_match' => [
-                    'query' => $searchTerm,
-                    'fields' => $searchFields,
-                    'fuzziness' => 'AUTO'
-                ]
-            ]
-        ]);
-
+        $searchResults = $this->elasticsearchService->search('vehicles', $query);
+        
         // Coleta os IDs dos resultados para buscar no banco de dados
         $ids = collect($searchResults['hits']['hits'])->pluck('_id')->toArray();
         
@@ -87,6 +118,7 @@ class VehicleRepository implements RepositoryInterface
                 'per_page' => $perPage,
                 'current_page' => $page,
                 'last_page' => 0,
+                'highlights' => []
             ];
         }
 
@@ -94,12 +126,17 @@ class VehicleRepository implements RepositoryInterface
         $query = $this->model->whereIn('id', $ids)
             ->orderByRaw("FIELD(id, " . implode(',', $ids) . ")"); // Mantém a ordem de relevância
         
-        $total = $query->count();
+        $total = $searchResults['hits']['total']['value'] ?? 0;
         
         // Aplica paginação manual
         $items = $query->skip(($page - 1) * $perPage)
             ->take($perPage)
             ->get();
+
+        // Processa os highlights
+        $highlights = collect($searchResults['hits']['hits'])->mapWithKeys(function ($hit) {
+            return [$hit['_id'] => $hit['highlight'] ?? []];
+        })->toArray();
 
         // Retorna resultado formatado
         return [
@@ -108,6 +145,7 @@ class VehicleRepository implements RepositoryInterface
             'per_page' => $perPage,
             'current_page' => $page,
             'last_page' => ceil($total / $perPage),
+            'highlights' => $highlights
         ];
     }
 
