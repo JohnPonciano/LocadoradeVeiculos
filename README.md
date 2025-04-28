@@ -18,6 +18,7 @@ Uma API RESTful para gerenciamento de aluguel de veículos, construída com Lara
 - MySQL 8.0+
 - Elasticsearch 7.x+
 - Docker e Docker Compose
+- Python 3.8+ (para o serviço de relatórios)
 
 ## Instalação
 
@@ -34,19 +35,38 @@ Uma API RESTful para gerenciamento de aluguel de veículos, construída com Lara
    cp .env.example .env
    ```
 
-3. Configure as variáveis de ambiente do Elasticsearch no .env:
+3. Configure as variáveis de ambiente no .env:
    ```
+   # Configurações do Laravel
+   APP_NAME="Vehicle Rental API"
+   APP_ENV=local
+   APP_KEY=
+   APP_DEBUG=true
+   APP_URL=http://localhost
+
+   # Configurações do banco de dados
+   DB_CONNECTION=mysql
+   DB_HOST=mysql
+   DB_PORT=3306
+   DB_DATABASE=locadora
+   DB_USERNAME=root
+   DB_PASSWORD=secret
+
+   # Configurações do Elasticsearch
    ELASTICSEARCH_ENABLED=true
    ELASTICSEARCH_HOST=elasticsearch
    ELASTICSEARCH_PORT=9200
    ELASTICSEARCH_SCHEME=http
    ELASTICSEARCH_USER=
    ELASTICSEARCH_PASS=
+
+   # Configurações do serviço Python de relatórios
+   REPORTS_SERVICE_URL=http://python-reports:8000
    ```
 
 4. Construa e inicie os containers:
    ```bash
-   docker-compose build --no-cache laravel.test
+   docker-compose build --no-cache
    docker-compose up -d
    ```
 
@@ -58,12 +78,191 @@ Uma API RESTful para gerenciamento de aluguel de veículos, construída com Lara
    docker-compose exec laravel.test php artisan jwt:secret
    ```
 
-6. Crie os índices do Elasticsearch:
-   ```bash
-   docker-compose exec laravel.test php artisan elastic:create-indices
-   ```
+O script de inicialização (`docker/start.sh`) executará automaticamente:
+- Verificação de disponibilidade dos serviços (MySQL, Elasticsearch, Python Reports)
+- Execução das migrations do Laravel
+- Criação e configuração dos índices do Elasticsearch
+- Indexação dos dados existentes
+- Inicialização do worker para processamento assíncrono das filas
+- Seed de dados iniciais
 
 Pronto! Acesse a API em http://localhost
+
+### Instalação Manual (sem Docker)
+
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/JohnPonciano/LocadoradeVeiculos.git
+   cd LocadoradeVeiculos
+   ```
+
+2. Instale as dependências do PHP:
+   ```bash
+   composer install
+   ```
+
+3. Configure o arquivo .env:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Gere a chave da aplicação:
+   ```bash
+   php artisan key:generate
+   ```
+
+5. Configure o banco de dados no arquivo .env:
+   ```
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=locadora
+   DB_USERNAME=seu_usuario
+   DB_PASSWORD=sua_senha
+   ```
+
+6. Configure o Elasticsearch no arquivo .env:
+   ```
+   ELASTICSEARCH_ENABLED=true
+   ELASTICSEARCH_HOST=localhost
+   ELASTICSEARCH_PORT=9200
+   ELASTICSEARCH_SCHEME=http
+   ```
+
+7. Execute as migrations e seeders:
+   ```bash
+   php artisan migrate --seed
+   ```
+
+8. Gere a chave JWT:
+   ```bash
+   php artisan jwt:secret
+   ```
+
+9. Crie os índices do Elasticsearch:
+   ```bash
+   php artisan elastic:create-indices
+   ```
+
+10. Indexe os dados existentes:
+    ```bash
+    php artisan elastic:index-all
+    ```
+
+11. Inicie o servidor:
+    ```bash
+    php artisan serve
+    ```
+
+12. Inicie o worker para processar as filas:
+    ```bash
+    php artisan queue:work --queue=elasticsearch
+    ```
+
+## Configuração do Elasticsearch
+
+### Usando Docker
+
+O Elasticsearch já está configurado no docker-compose.yml e é inicializado automaticamente pelo script `docker/start.sh`. Este script:
+
+1. Verifica a disponibilidade do Elasticsearch
+2. Verifica a versão e plugins instalados
+3. Verifica os índices existentes
+4. Cria/atualiza os índices necessários
+5. Indexa os dados existentes
+6. Inicia o worker para processamento assíncrono
+
+Para verificar se está funcionando:
+
+```bash
+docker-compose ps
+```
+
+Para verificar os logs do Elasticsearch:
+
+```bash
+docker-compose logs elasticsearch
+```
+
+Para verificar os logs do script de inicialização:
+
+```bash
+docker-compose logs laravel.test
+```
+
+### Instalação Manual do Elasticsearch
+
+1. Instale o Elasticsearch seguindo a [documentação oficial](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html)
+
+2. Configure o Elasticsearch para aceitar conexões externas (se necessário):
+   Edite o arquivo `config/elasticsearch.yml`:
+   ```
+   network.host: 0.0.0.0
+   discovery.type: single-node
+   ```
+
+3. Inicie o serviço:
+   ```bash
+   sudo systemctl start elasticsearch
+   sudo systemctl enable elasticsearch
+   ```
+
+4. Verifique se o serviço está rodando:
+   ```bash
+   curl http://localhost:9200
+   ```
+
+## Executando o Serviço Python de Relatórios
+
+### Usando Docker
+
+O serviço Python já está configurado no docker-compose.yml e é inicializado automaticamente pelo script `docker/start.sh`. Este script verifica a disponibilidade do serviço antes de prosseguir com a inicialização do Laravel.
+
+Para verificar se está funcionando:
+
+```bash
+docker-compose ps
+```
+
+Para verificar os logs do serviço Python:
+
+```bash
+docker-compose logs python-reports
+```
+
+### Instalação Manual do Serviço Python
+
+1. Navegue até o diretório do serviço Python:
+   ```bash
+   cd python-reports
+   ```
+
+2. Crie um ambiente virtual:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # No Windows: venv\Scripts\activate
+   ```
+
+3. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure as variáveis de ambiente:
+   ```bash
+   export DB_CONNECTION=mysql
+   export DB_HOST=localhost
+   export DB_PORT=3306
+   export DB_DATABASE=locadora
+   export DB_USERNAME=seu_usuario
+   export DB_PASSWORD=sua_senha
+   export PORT=8000
+   ```
+
+5. Inicie o serviço:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
 
 ## Estrutura da API
 
@@ -76,7 +275,7 @@ Pronto! Acesse a API em http://localhost
 ### Veículos
 
 - `GET /api/vehicles` - Listar todos os veículos (com paginação)
-- `GET /api/vehicles?search=termo` - Pesquisar veículos usando Elasticsearch
+- `GET /api/vehicles/search?q=termo` - Pesquisar veículos usando Elasticsearch
 - `GET /api/vehicles/{id}` - Obter detalhes de um veículo
 - `POST /api/vehicles` - Criar novo veículo
 - `PUT /api/vehicles/{id}` - Atualizar veículo existente
@@ -103,15 +302,45 @@ Pronto! Acesse a API em http://localhost
 
 A API utiliza Elasticsearch para proporcionar busca avançada de veículos com os seguintes recursos:
 
-- **Busca em múltiplos campos** - Pesquisa marca, modelo, ano, cor, placa e descrição simultaneamente
-- **Pesos de relevância** - Resultados onde o termo aparece no modelo têm prioridade sobre outros campos
+- **Busca em múltiplos campos** - Pesquisa marca, modelo, placa e outros campos simultaneamente
+- **Pesos de relevância** - Resultados onde o termo aparece na placa têm prioridade (plate^3)
 - **Fuzzy matching** - Encontra resultados mesmo com pequenos erros de digitação
+- **Highlights** - Destaca os termos encontrados nos resultados
 - **Sincronização automática** - Todos os registros são automaticamente indexados no Elasticsearch pelos observers
 
-Para usar a busca avançada, basta passar o parâmetro `search` na rota GET /api/vehicles:
+Para usar a busca avançada, utilize o endpoint dedicado:
 
 ```
-GET /api/vehicles?search=honda+civic+2022
+GET /api/vehicles/search?q=termo
+```
+
+Exemplo de resposta:
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "plate": "ABC1234",
+            "make": "Toyota",
+            "model": "Corolla",
+            "daily_rate": 100.00,
+            "available": true
+        }
+    ],
+    "meta": {
+        "total": 1,
+        "per_page": 10,
+        "current_page": 1,
+        "last_page": 1,
+        "search_term": "toyota"
+    },
+    "highlights": {
+        "1": {
+            "make": ["<em>Toyota</em>"],
+            "model": ["<em>Corolla</em>"]
+        }
+    }
+}
 ```
 
 ## Testes com Postman
@@ -162,20 +391,41 @@ Se você encontrar problemas relacionados ao Elasticsearch:
 
 2. **Verifique a conexão a partir do container**:
    ```bash
-   ./vendor/bin/sail bash -c "curl elasticsearch:9200"
+   docker-compose exec laravel.test curl elasticsearch:9200
    ```
 
-3. **Reindexe os dados** (se os dados não estiverem aparecendo nas buscas):
+3. **Verifique os logs do script de inicialização**:
    ```bash
-   ./vendor/bin/sail artisan elastic:reindex
+   docker-compose logs laravel.test
    ```
 
-4. **Desative temporariamente o Elasticsearch** (para depuração):
+4. **Verifique os logs do Elasticsearch**:
+   ```bash
+   docker-compose logs elasticsearch
+   ```
+
+5. **Desative temporariamente o Elasticsearch** (para depuração):
    Edite o arquivo .env e defina `ELASTICSEARCH_ENABLED=false`
 
-Veja o arquivo [CONTAINER_GUIDE.md](CONTAINER_GUIDE.md) para mais detalhes sobre solução de problemas.
+### Problemas com o Serviço Python
 
-## Licença
+Se você encontrar problemas com o serviço Python de relatórios:
 
-Este projeto está licenciado sob a [Licença MIT](LICENSE).
+1. **Verifique se o serviço está rodando**:
+   ```bash
+   curl http://localhost:8000
+   ```
+
+2. **Verifique os logs do serviço**:
+   ```bash
+   docker-compose logs python-reports
+   ```
+
+3. **Verifique a conexão com o banco de dados**:
+   ```bash
+   docker-compose exec python-reports python -c "from app.database import engine; from sqlalchemy import text; with engine.connect() as conn: result = conn.execute(text('SELECT 1')); print(result.fetchone())"
+   ```
+
+Veja o arquivo [workflow.md](workflow.md) para mais detalhes sobre como foi feita algumas soluções e como o fluxo de trabalho foi projetado.
+
 

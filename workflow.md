@@ -215,13 +215,58 @@ O serviço Python fornece processamento analítico e geração de relatórios pa
 
 ### Fluxo de Busca Avançada com Elasticsearch
 
-1. O usuário envia uma requisição para `/api/vehicles?search=termo` ou `/api/vehicles/search?q=termo`
+1. O usuário envia uma requisição para `/api/vehicles/search?q=termo`
 2. O `VehicleController` recebe a requisição e extrai o termo de busca
 3. O controller chama o método `searchWithElasticsearch()` do `VehicleRepository`
 4. O repositório utiliza o `ElasticsearchService` para realizar a busca no índice de veículos
 5. O Elasticsearch processa a busca aplicando relevância e critérios definidos
 6. Os resultados são devolvidos ao controller que formata a resposta JSON
-7. A resposta é enviada ao cliente com os resultados paginados
+7. A resposta é enviada ao cliente com os resultados paginados e highlights
+
+#### Detalhes da Implementação de Busca
+
+A busca de veículos com Elasticsearch foi implementada com as seguintes características:
+
+- **Mapeamento Otimizado**: Campos configurados com tipos apropriados (keyword, text) e analisadores personalizados
+- **Busca Fuzzy**: Suporte a erros de digitação com `fuzziness: 'AUTO'`
+- **Relevância Personalizada**: Campos com pesos diferentes (plate^3, make^2, model^2)
+- **Busca Exata**: Suporte a busca exata de placa com boost maior
+- **Highlights**: Destaque dos termos encontrados nos resultados
+- **Paginação**: Suporte a paginação dos resultados
+- **Ordenação**: Resultados ordenados por relevância e data de criação
+- **Logs Detalhados**: Registro de operações para diagnóstico
+
+#### Exemplo de Resposta da API
+
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "plate": "ABC1234",
+            "make": "Toyota",
+            "model": "Corolla",
+            "daily_rate": 100.00,
+            "available": true,
+            "created_at": "2024-03-20T10:00:00.000000Z",
+            "updated_at": "2024-03-20T10:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "total": 1,
+        "per_page": 10,
+        "current_page": 1,
+        "last_page": 1,
+        "search_term": "toyota"
+    },
+    "highlights": {
+        "1": {
+            "make": ["<em>Toyota</em>"],
+            "model": ["<em>Corolla</em>"]
+        }
+    }
+}
+```
 
 ### Fluxo de Criação/Atualização/Remoção de Veículo com Sincronização Elasticsearch
 
@@ -281,8 +326,11 @@ ELASTICSEARCH_PASS=
 O sistema mantém os seguintes índices:
 
 1. **vehicles**: Armazena documentos de veículos para busca rápida
-   - Campos indexados: plate, make, model
+   - Campos indexados: plate, make, model, daily_rate, available, created_at, updated_at
    - Configurado com análise de texto e relevância
+   - Mapeamento otimizado com campos multi-tipo (keyword e text)
+   - Analisador personalizado para melhor tratamento de texto
+   - Suporte a busca fuzzy e highlights
 
 2. **customers**: Armazena documentos de clientes
    - Campos indexados: name, email, phone, cnh

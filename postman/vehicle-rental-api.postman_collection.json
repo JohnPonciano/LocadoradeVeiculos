@@ -186,7 +186,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/vehicles?search=toyota",
+							"raw": "{{base_url}}/api/vehicles?search?q=toyota",
 							"host": [
 								"{{base_url}}"
 							],
