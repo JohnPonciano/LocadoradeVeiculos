@@ -46,4 +46,9 @@ Route::middleware('auth:api')->group(function () {
     
     // Rotas para relatórios
     Route::get('reports/revenue', [ReportController::class, 'revenue']);
+
+    // Health check
+    Route::get('health', function () {
+        return response()->json(['status' => 'ok']);
+    });
 }); 

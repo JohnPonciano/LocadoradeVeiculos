@@ -8,6 +8,9 @@ use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Service class for Elasticsearch operations
+ */
 class ElasticsearchService
 {
     protected Client $client;
@@ -57,7 +60,7 @@ class ElasticsearchService
     }
 
     /**
-     * Get the Elasticsearch client
+     * Get the Elasticsearch client instance
      */
     public function getClient(): Client
     {
@@ -65,7 +68,7 @@ class ElasticsearchService
     }
 
     /**
-     * Create or update an index for a given model
+     * Index a document in Elasticsearch
      */
     public function indexDocument(string $index, string $id, array $body): array
     {
@@ -106,7 +109,7 @@ class ElasticsearchService
     }
 
     /**
-     * Search in the given index
+     * Search for documents in Elasticsearch
      */
     public function search(string $index, array $query): array
     {
@@ -154,7 +157,7 @@ class ElasticsearchService
     }
 
     /**
-     * Delete a document from an index
+     * Delete a document from Elasticsearch
      */
     public function deleteDocument(string $index, string $id): array
     {
@@ -192,7 +195,7 @@ class ElasticsearchService
     }
 
     /**
-     * Delete an index
+     * Delete an index from Elasticsearch
      */
     public function deleteIndex(string $index): array
     {

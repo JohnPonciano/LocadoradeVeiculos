@@ -2,6 +2,7 @@
 set -e
 
 # Verificar se o comando ps está instalado, caso contrário, instalá-lo
+# Ele serve para verificar se o worker está executando corretamente e para rodar ele em segundo plano
 if ! command -v ps >/dev/null 2>&1; then
     echo "📦 Instalando ps (procps)..."
     apt-get update && apt-get install -y procps
@@ -38,6 +39,9 @@ check_service "Elasticsearch" 30 "curl -s \"$ELASTICSEARCH_SCHEME://$ELASTICSEAR
 
 # Verificar Python Reports Service com timeout de 30 tentativas (90 segundos)
 check_service "Python Reports Service" 30 "curl -s http://python-reports:3000 | grep -q '{\"status\":\"ok\",\"message\":\"Vehicle Rental API Reports Service\"}'"
+
+echo "🔄 Esperando 5 segundos para garantir que todos os serviços estão online..."
+sleep 5    
 
 # Verificar se o Elasticsearch está totalmente operacional
 echo "🔄 Verificando configuração do Elasticsearch..."

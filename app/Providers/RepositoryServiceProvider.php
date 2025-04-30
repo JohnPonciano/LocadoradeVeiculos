@@ -8,7 +8,7 @@ use App\Repositories\VehicleRepository;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Provider para registrar os repositórios
+ * Provider é para registrar os repositórios 
  * 
  * Este provider é responsável por registrar os repositórios no container
  * de injeção de dependências, permitindo a resolução automática das dependências
