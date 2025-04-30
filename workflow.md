@@ -361,12 +361,6 @@ REPORTS_SERVICE_URL=http://python-reports:8000
 
 ## Benefícios da Arquitetura
 
-### Separação de Responsabilidades
-Cada componente tem uma função específica, tornando o código mais organizado e fácil de entender.
-
-### Testabilidade
-A injeção de dependências facilita a criação de testes unitários com mocks.
-
 ### Manutenibilidade
 Alterações em uma camada não afetam diretamente as outras, facilitando manutenção.
 
